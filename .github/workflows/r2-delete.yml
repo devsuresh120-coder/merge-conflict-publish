@@ -1,0 +1,44 @@
+name: R2 delete
+
+# Deletes the episodes listed in social-hub/data/merge-conflict/queue/r2_delete.txt from R2, then empties the list.
+# PUBLIC repo: data stays in the private social-hub repo; the log here shows only a status line.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: devsuresh120-coder/social-hub
+          token: ${{ secrets.HUB_TOKEN }}
+          path: hub
+          sparse-checkout: data/merge-conflict
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q boto3 > /dev/null
+      - name: Delete listed episodes from R2
+        working-directory: hub/data/merge-conflict
+        env:
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PREFIX: merge-conflict
+        run: |
+          mkdir -p logs
+          if python "$GITHUB_WORKSPACE/publish/r2_delete.py" > "logs/r2_delete_$(date -u +%Y%m%d_%H%M%S).txt" 2>&1; then echo "r2 delete: ok"; else echo "::error::r2 delete failed (log in social-hub)"; exit 1; fi
+      - name: Save to social-hub (private)
+        if: always()
+        working-directory: hub
+        run: |
+          git config user.name "merge-conflict-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A data/merge-conflict/queue/r2_delete.txt data/merge-conflict/logs > /dev/null 2>&1
+          git diff --cached --quiet || { git commit -qm "merge-conflict: R2 delete done [skip ci]"; git pull -q --rebase && git push -q; }

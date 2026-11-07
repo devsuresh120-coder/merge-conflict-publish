@@ -1,0 +1,73 @@
+name: Publish to Buffer
+
+# PUBLIC repo: only code lives here. All data (schedule, captions, videos, logs) is in the PRIVATE repo
+# social-hub under data/merge-conflict/. This job checks it out with HUB_TOKEN, runs the publisher there, saves
+# posted.json + a private log back to social-hub, and prints nothing but a status line (public logs never show data).
+on:
+  schedule:
+    - cron: "17 4,16 * * *"   # twice a day: top up the Buffer queues (posts are made up to 6 days ahead)
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "publish | list-channels | dry-run | reschedule"
+        default: "publish"
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: devsuresh120-coder/social-hub
+          token: ${{ secrets.HUB_TOKEN }}
+          path: hub
+          sparse-checkout: data/merge-conflict
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -q requests boto3 > /dev/null
+      - name: Publish (output goes to the private log only)
+        working-directory: hub/data/merge-conflict
+        env:
+          ACTION: ${{ github.event.inputs.action || 'publish' }}
+          BUFFER_ACCESS_TOKEN: ${{ secrets.BUFFER_ACCESS_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_PREFIX: merge-conflict
+          DRY_RUN: ${{ github.event.inputs.action == 'dry-run' && '1' || '' }}
+        run: |
+          mkdir -p logs; LOG="logs/publish_$(date -u +%Y%m%d_%H%M%S).txt"; P="$GITHUB_WORKSPACE/publish"
+          set +e
+          {
+            if [ "$ACTION" = "list-channels" ]; then python "$P/list_channels.py"; else
+              case "$ACTION" in reschedule|dry-run) python "$P/reschedule.py";; esac
+              python "$P/publish.py"
+            fi
+          } > "$LOG" 2>&1
+          code=$?
+          ls -1t logs/publish_*.txt | tail -n +31 | xargs -r rm -f   # keep the last 30 logs
+          echo "STATUS=$code" >> "$GITHUB_ENV"
+          if [ $code -eq 0 ]; then echo "publish: ok"; else echo "::error::publish failed (details in social-hub/data/merge-conflict/$LOG)"; fi
+      - name: Save results to social-hub (private)
+        if: always()
+        working-directory: hub
+        run: |
+          git config user.name "merge-conflict-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add -A data/merge-conflict/queue/posted.json data/merge-conflict/logs > /dev/null 2>&1
+          if ! git diff --cached --quiet; then
+            git commit -qm "merge-conflict: publish results [skip ci]"
+            for i in 1 2 3 4 5; do git pull -q --rebase && git push -q && break; sleep 5; done
+          fi
+          exit "${STATUS:-0}"
