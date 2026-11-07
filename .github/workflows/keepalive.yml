@@ -1,0 +1,21 @@
+name: Keep scheduled workflows alive
+
+# GitHub switches scheduled workflows off after 60 days without repository activity. One empty commit a month
+# keeps the clock reset. No data is touched.
+on:
+  schedule:
+    - cron: "11 3 5 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          git config user.name "publish-bot"; git config user.email "bot@users.noreply.github.com"
+          git commit --allow-empty -qm "keepalive [skip ci]" && git push -q
+          echo "keepalive: ok"
