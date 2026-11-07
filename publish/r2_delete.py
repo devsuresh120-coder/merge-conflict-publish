@@ -14,7 +14,7 @@ import sys
 
 import boto3
 
-LIST = os.path.join(os.path.dirname(__file__), "..", "queue", "r2_delete.txt")
+LIST = os.path.join(os.environ.get("DATA_DIR") or os.path.join(os.path.dirname(__file__), ".."), "queue", "r2_delete.txt")
 DRY = os.environ.get("DRY_RUN") == "1"
 
 

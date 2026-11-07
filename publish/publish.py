@@ -20,7 +20,7 @@ import csv, json, os, re, sys, time, datetime as dt
 from zoneinfo import ZoneInfo
 import requests
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.abspath(os.environ.get("DATA_DIR") or os.path.join(os.path.dirname(__file__), ".."))  # DATA_DIR = the private data folder (social-hub/data/merge-conflict)
 SCHEDULE = os.path.join(ROOT, "queue", "schedule.csv")
 POSTED = os.path.join(ROOT, "queue", "posted.json")
 API = "https://api.buffer.com"

@@ -31,6 +31,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PREFIX: merge-conflict
+          DATA_DIR: ${{ github.workspace }}/hub/data/merge-conflict
         run: |
           mkdir -p logs
           if python "$GITHUB_WORKSPACE/publish/r2_delete.py" > "logs/r2_delete_$(date -u +%Y%m%d_%H%M%S).txt" 2>&1; then echo "r2 delete: ok"; else echo "::error::r2 delete failed (log in social-hub)"; exit 1; fi

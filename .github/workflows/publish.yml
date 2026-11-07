@@ -45,6 +45,7 @@ jobs:
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
           R2_PREFIX: merge-conflict
+          DATA_DIR: ${{ github.workspace }}/hub/data/merge-conflict
           DRY_RUN: ${{ github.event.inputs.action == 'dry-run' && '1' || '' }}
         run: |
           mkdir -p logs; LOG="logs/publish_$(date -u +%Y%m%d_%H%M%S).txt"; P="$GITHUB_WORKSPACE/publish"
